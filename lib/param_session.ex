@@ -10,6 +10,7 @@ defmodule ParamSession do
   # we need this value accessible not only when the plug is called through
   # call(), but also when the other functions are called directly
   @opts COOKIE.init Application.get_all_env(:param_session) 
+  def cookieopts, do: @opts
 
   def init(_) do
   end
@@ -19,13 +20,7 @@ defmodule ParamSession do
   # get_session and put_session
   def call(conn, _) do
     if sessionenc = conn.params["session"] do
-      sessionenc = sessionenc
-      |> String.replace("-", "+")
-      |> String.replace("_", "/")
-      |> String.replace(".", "=")
-      |> Base.decode64!
-      {_, session} = COOKIE.get(conn, sessionenc, @opts)
-      Logger.info("Session: #{inspect(session, pretty: true)}")
+      session = string_to_session(conn, sessionenc)
     else
       session = %{}
     end
@@ -35,10 +30,21 @@ defmodule ParamSession do
     |> Conn.put_private(:plug_session_fetch, :done)
   end
 
+  def string_to_session(conn, str) do
+    str = str
+    |> String.replace("-", "+")
+    |> String.replace("_", "/")
+    |> String.replace(".", "=")
+    |> Base.decode64!
+    case COOKIE.get(conn, str, @opts) do
+      {_, session} -> session
+    end
+  end
+
   # generates the param string if any session parameters have been set with
   # put_session
   def gen_cookie(conn) do
-    if conn.private[:plug_session] do
+    if !Enum.empty?(conn.private[:plug_session]) do
       COOKIE.put(conn, [], conn.private.plug_session, @opts)
       |> Base.encode64
       |> String.replace("+", "-")
@@ -79,7 +85,8 @@ defmodule ParamSession do
   def redirect(conn, to) do
     url  = gen_url(conn, to)
     html = Plug.HTML.html_escape(url)
-    body = "<html><body>You are being <a href=\"#{html}\">redirected</a>.</body></html>"
+    body = "<html><body>You are being <a href=\"#{html}\">
+    redirected</a>.</body></html>"
 
     conn
     |> Conn.put_resp_header("location", url)
