@@ -90,7 +90,7 @@ defmodule ParamSession do
 
     conn
     |> Conn.put_resp_header("location", url)
-    |> Conn.send_resp(conn.status || 302, "text/html", body)
+    |> Conn.send_resp(302, body)
   end
 end
 
